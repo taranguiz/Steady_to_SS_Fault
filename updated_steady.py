@@ -165,9 +165,9 @@ def add_file_to_writer(filename):
 # plt.show()
 
 #timing
-tmax= 8000000 #5000000
-dt=200 #200
-model_time=np.arange(0,tmax,dt)
+total_steady_time= 8000000 #5000000
+dt_steady=200 #200
+model_time=np.arange(0,total_steady_time,dt_steady)
 iterations=len(model_time)
 # print(iterations)
 #to track elevation changes

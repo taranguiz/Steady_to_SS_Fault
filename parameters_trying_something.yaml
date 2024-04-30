@@ -33,8 +33,10 @@ tectonics:
   method: 'roll' #or drop
 
 time:
-  total_model_time: 6000000 #6000000 #6000000
-  dt: 100
+  total_model_time: 6000000 
+  total_steady_time: 8000000 #total time for steady state
+  dt_steady: 200
+  dt_model: 100
 
 climate:
   fluvial_freq: 100000 #how often the humid period occurs
