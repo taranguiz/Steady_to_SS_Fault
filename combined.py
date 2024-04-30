@@ -13,4 +13,4 @@ from model_config import ModelConfig
 config = ModelConfig()
 
 print(config.model_name)
-print(config.sp_crit_br)
+print(config.dt_steady)
