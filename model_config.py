@@ -1,18 +1,27 @@
 import yaml
-from yaml.loader import SafeLoader
+import numpy as np
+import os
+
+# Get the directory containing this script
+_script_dir = os.path.dirname(__file__)
+# Construct the full path to the config file
+_config_path = os.path.join(_script_dir, 'parameters_trying_something.yaml')
     
 class ModelConfig:
     
     def __init__(self):
         self.config = yaml.safe_load(
             open(
-                'parameters_trying_something.yaml',
+                _config_path,
                 'r'
             )
         )
         #General 
         self.model_name = self.config['saving']['model_name']
         self.alt_name = self.config['comments']['alt_name']
+        self.home_path = self.config['saving']['home_path']
+        self.save_location = 'output/%s'%self.model_name
+
         #Shape
         self.ymax=self.config['shape']['ymax']
         self.xmax=self.config['shape']['xmax']
@@ -23,6 +32,7 @@ class ModelConfig:
         
         #Geomorphology
         self.uplift_rate= self.config['geomorphology']['uplift_rate']
+        self.H0= self.config['geomorphology']['H0'] #initial soil
 
         #Hillsope Geomorphology for DDTD component
         self.Sc=self.config['geomorphology']['Sc']
@@ -47,16 +57,15 @@ class ModelConfig:
         self.sp_crit_br= self.config['geomorphology']['sp_crit_br'] #bedrock erosion threshold
         
         #Strike Slip Fault 
-        self.total_slip= self.config['tectonics']['total_slip'] #total distance to slip
+        self.total_slip= float(self.config['tectonics']['total_slip']) #total distance to slip
         self.method= self.config['tectonics']['method'] #roll or drop 
 
         #Time
-        self.total_model_time= self.config['time']['total_model_time']
-        self.dt_model= self.config['time']['dt_model']
-        self.total_steady_time= self.config['time']['total_steady_time']
-        self.dt_steady= self.config['time']['dt_steady']
+        self.total_model_time= float(self.config['time']['total_model_time'])
+        self.dt_model= float(self.config['time']['dt_model'])
+        self.total_steady_time= float(self.config['time']['total_steady_time'])
+        self.dt_steady= float(self.config['time']['dt_steady'])
 
         #Climate
-        self.fluvial_freq=self.config['climate']['fluvial_freq'] #how often the humid period occurs
-        self.fluvial_len=self.config['climate']['fluvial_len'] #how long the humid period last
-
+        self.fluvial_freq=float(self.config['climate']['fluvial_freq']) #how often the humid period occurs
+        self.fluvial_len=float(self.config['climate']['fluvial_len']) #how long the humid period last
