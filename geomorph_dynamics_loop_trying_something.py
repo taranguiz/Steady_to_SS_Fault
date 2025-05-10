@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 # import time
 import pickle
 from collections import defaultdict
+import os # Added import
 
 #from Landlab
 from landlab import RasterModelGrid, imshow_grid, imshowhs_grid
@@ -29,6 +30,7 @@ from copy import deepcopy
 #READING STEADY STATE TOPO
 
 def read_grid(config):
+    
     """Read the final steady state from pickle file efficiently"""
     print("reading steady topo")
     # Read the final steady state
@@ -58,22 +60,40 @@ def run_geomorf_loop(config, writer):
     mg = read_grid(config)
     print(mg.at_node.keys())
     #exit()
-    # Initialize dictionary to store all states
-    grid_states = defaultdict(dict)
     
-    # Define output filename at the start
-    output_filename = f'/Volumes/UltraTouch/pickle/{config.model_name}_dynamic_states.pkl'
-    
-    # Try to load existing states if they exist
-    try:
-        with open(output_filename, 'rb') as f:
-            grid_states = pickle.load(f)
-            print(f"Loaded {len(grid_states)} existing grid states from {output_filename}")
+    # Define NetCDF fields to save (if using netcdf format)
+    netcdf_field_names = [
+        'bedrock__elevation', 'drainage_area', 'flood_status_code',
+        'flow__link_to_receiver_node', 'flow__receiver_node', 'flow__receiver_proportions',
+        'flow__upstream_node_order', 'soil__depth', 'soil_production__rate',
+        'surface_water__discharge', 'topographic__elevation', 'topographic__steepest_slope',
+        'water__unit_flux_in', 'sediment__influx', 'sediment__outflux', 'sediment__flux'
+    ]
 
-    except FileNotFoundError:
-        print("No existing grid states found, starting fresh")
+    # Define base output directory for pickle files
     
+    if hasattr(config, 'save_format') and config.save_format == 'pickle':
+        pickle_output_dir = os.path.join(config.home_path, config.save_location, 'pickle_outputs', config.model_name)
+        os.makedirs(pickle_output_dir, exist_ok=True)
+        pickle_output_filename = os.path.join(pickle_output_dir, f"{config.model_name}_dynamic_states.pkl")
+    else:
+        # Fallback or define if only netcdf is primary, though loading below is pickle-specific
+        pickle_output_filename = None # Or some default non-saving path
 
+    grid_states = defaultdict(dict) # Initialize grid_states
+
+    # Try to load existing states if they exist (Pickle specific)
+    if hasattr(config, 'save_format') and config.save_format == 'pickle' and pickle_output_filename:
+        try:
+            with open(pickle_output_filename, 'rb') as f:
+                grid_states = pickle.load(f)
+                print(f"Loaded {len(grid_states)} existing grid states from {pickle_output_filename}")
+        except FileNotFoundError:
+            print(f"Pickle file {pickle_output_filename} not found, starting fresh.")
+        except (pickle.UnpicklingError, EOFError) as e:
+            print(f"Error loading pickle file {pickle_output_filename}: {e}. Starting fresh.")
+    elif not hasattr(config, 'save_format'):
+        print("Warning: config.save_format is not set. Saving and Loading behavior may be undefined.")
 
     z = mg.at_node['topographic__elevation']
     soil = mg.at_node['soil__depth']
@@ -85,7 +105,7 @@ def run_geomorf_loop(config, writer):
     iterations= np.arange(0,config.total_model_time+config.dt_model,config.dt_model)
     print(iterations)
     
-    desired_slip_per_event=(config.total_slip/config.total_model_time)*config.dt_model
+    desired_slip_per_event=(config.slip_rate/1000)*config.dt_model
     shrink = 0.5
     fault_loc_y=int(mg.number_of_node_rows / 3.)
     fault_nodes = np.where(mg.node_y==(fault_loc_y*10))[0]
@@ -101,7 +121,7 @@ def run_geomorf_loop(config, writer):
     #things for the loop
     time=0 #time counter
     fluvial_idx=0 #index counter for fluvial periods
-    accumulate=0
+    accumulate=0 #counter for fault earthquake times
     Mean_da= [] #Mean drainage area
     Mean_elev=[] #mean elevation
     Mean_soil=[] #mean soil depth
@@ -157,16 +177,18 @@ def run_geomorf_loop(config, writer):
         #comment next line if is pulse climate
         #space.run_one_step(config.dt_model)
 
-        accumulate += desired_slip_per_event
-        print('is accumulating')
+        
 
         Mean_da= np.append(Mean_da, np.mean(mg.at_node['drainage_area']))
         Mean_soil= np.append(Mean_soil, np.mean(mg.at_node['soil__depth']))
         Mean_elev= np.append(Mean_elev, np.mean(mg.at_node['topographic__elevation']))
 
         if accumulate >= mg.dx:
-            ss_fault(grid=mg, fault_loc_y=fault_loc_y, total_slip=config.total_slip,
-                    total_time=config.total_model_time, method=config.method, accumulate=accumulate)
+            ss_fault(grid=mg, 
+                     fault_loc_y=fault_loc_y, 
+                     slip_rate=config.slip_rate, 
+                     method=config.method, 
+                     accumulate=accumulate)
             accumulate = accumulate % mg.dx
             # expweath.maximum_weathering_rate=1*1e-6
             # expweath.calc_soil_prod_rate()
@@ -174,11 +196,14 @@ def run_geomorf_loop(config, writer):
             quakes_times=np.append(quakes_times, time)
             print('one slip')
         
+        accumulate += desired_slip_per_event
+        print('is accumulating')
+
         #comment next if when doing cont climate
         if len(fluvial_times) > 0 and fluvial_idx < len(fluvial_times):  # Add safety check
             if time >= fluvial_times[fluvial_idx,0] and time <= fluvial_times[fluvial_idx,1]:
                 print(f'is: {time} fluvial time, index {fluvial_idx}')
-                fr.run_one_step()
+                #fr.run_one_step()
                 space.run_one_step(config.dt_model)
                 if time == fluvial_times[fluvial_idx,1] and fluvial_idx < (len(fluvial_times)-1):
                     fluvial_idx += 1
@@ -202,27 +227,90 @@ def run_geomorf_loop(config, writer):
 
             plt.clf()
             
-        if time%10000 == 0:
-            # Save grid state to memory
-            grid_states[time] = deepcopy(mg)
+        if time%config.frequency_output == 0:                
             
-            # Save to disk
-            print(f"Saving grid states at time {time}...")
-            with open(output_filename, 'wb') as f:
-                pickle.dump(grid_states, f)
-            print(f"Saved {len(grid_states)} grid states")
+            if hasattr(config, 'save_format'):
+                if config.save_format == 'pickle':
+                    # Save grid state to memory (useful for current session, e.g. for final pickle dump if selected)
+                    grid_states[time] = deepcopy(mg)
+                    if pickle_output_filename:
+                        print(f"Saving grid states to Pickle at time {time}...")
+                        with open(pickle_output_filename, 'wb') as f: # Overwrites pickle file with full history
+                            pickle.dump(grid_states, f)
+                        print(f"Saved {len(grid_states)} grid states to {pickle_output_filename}")
+                    else:
+                        print("Pickle output filename not defined. Skipping save.")
+                elif config.save_format == 'netcdf':
+                    print(f"Saving grid state to NetCDF at time {time}...")
+                    netcdf_output_dir = os.path.join(config.home_path, config.save_location, 'netcdf_outputs', config.model_name)
+                    os.makedirs(netcdf_output_dir, exist_ok=True)
+                    current_time_for_filename = int(config.total_steady_time + time)
+                    sequence_str = get_file_sequence(current_time_for_filename, config)
+                    netcdf_filename = os.path.join(netcdf_output_dir, f"{config.model_name}{sequence_str}.nc")
+                    
+                    # Ensure known integer fields are explicitly int64 before saving
+                    int_fields_to_cast = ['flood_status_code', 'flow__link_to_receiver_node', 'flow__receiver_node', 'flow__upstream_node_order']
+                    for field_name in int_fields_to_cast:
+                        if field_name in mg.at_node and mg.at_node[field_name] is not None:
+                            try:
+                                mg.at_node[field_name] = mg.at_node[field_name].astype(np.int64)
+                            except Exception as e:
+                                print(f"Warning: Could not cast {field_name} to np.int64 before periodic save: {e}")
+                                
+                    try:
+                        write_netcdf(netcdf_filename, mg, names=netcdf_field_names, format="NETCDF3_64BIT") 
+                        print(f"Saved NetCDF to {netcdf_filename}")
+                    except Exception as e:
+                        print(f"Error saving NetCDF file {netcdf_filename}: {e}")
+                else:
+                    print(f"Unknown save_format: {config.save_format}. No data saved for time {time}.")
+            else:
+                print("Warning: config.save_format not set. No data saved for time {time}.")
 
         print(time)
         time = time + config.dt_model
         # print(time) 
     
     # Save final timestep
-    grid_states[config.total_model_time] = deepcopy(mg)
-    with open(output_filename, 'wb') as f:
-        pickle.dump(grid_states, f)
-    print(f"\nFinal save: {len(grid_states)} grid states saved to {output_filename}")
+    grid_states[config.total_model_time] = deepcopy(mg) # Store final state in memory
+
+    if hasattr(config, 'save_format'):
+        if config.save_format == 'pickle':
+            if pickle_output_filename:
+                print(f"Final save of grid states to Pickle...")
+                with open(pickle_output_filename, 'wb') as f:
+                    pickle.dump(grid_states, f) # Dumps the entire history
+                print(f"\nFinal save: {len(grid_states)} grid states saved to {pickle_output_filename}")
+            else:
+                print("Pickle output filename not defined. Skipping final pickle save.")
+        elif config.save_format == 'netcdf':
+            print(f"Final save of grid state to NetCDF...")
+            netcdf_output_dir = os.path.join(config.home_path, config.save_location, 'netcdf_outputs', config.model_name)
+            os.makedirs(netcdf_output_dir, exist_ok=True)
+            final_time_for_filename = int(config.total_steady_time + config.total_model_time)
+            sequence_str = get_file_sequence(final_time_for_filename, config)
+            netcdf_filename = os.path.join(netcdf_output_dir, f"{config.model_name}{sequence_str}.nc")
+
+            # Ensure known integer fields are explicitly int64 before final saving
+            int_fields_to_cast = ['flood_status_code', 'flow__link_to_receiver_node', 'flow__receiver_node', 'flow__upstream_node_order']
+            for field_name in int_fields_to_cast:
+                if field_name in mg.at_node and mg.at_node[field_name] is not None:
+                    try:
+                        mg.at_node[field_name] = mg.at_node[field_name].astype(np.int64)
+                    except Exception as e:
+                        print(f"Warning: Could not cast {field_name} to np.int64 before final save: {e}")
+                        
+            try:
+                write_netcdf(netcdf_filename, mg, names=netcdf_field_names, format="NETCDF3_64BIT") 
+                print(f"\nFinal NetCDF saved to {netcdf_filename}")
+            except Exception as e:
+                print(f"Error saving final NetCDF file {netcdf_filename}: {e}")
+        else:
+            print(f"Unknown save_format: {config.save_format}. No final data saved.")
+    else:
+        print("Warning: config.save_format not set. No final data saved.")
     
-    imshow_grid(mg, z, cmap='coolwarm', shrink=shrink, grid_units=['m', 'm']) 
+    imshow_grid(mg, z, cmap='coolwarm', shrink=shrink, grid_units=['m', 'm'])
     plt.title('Topography after ' + str(int(config.total_steady_time + config.total_model_time)) + ' years')
     loop_topo_img  = f'{config.home_path}/{config.save_location}/{config.model_name}{get_file_sequence(int(config.total_steady_time + config.total_model_time), config)}.png'
     plt.savefig(loop_topo_img,
@@ -231,6 +319,49 @@ def run_geomorf_loop(config, writer):
                 )
     add_file_to_writer(writer, loop_topo_img)
     plt.clf()
+
+    # Save timeseries data and event data to text files
+    tabular_output_dir = os.path.join(config.home_path, config.save_location, 'tabular_outputs', config.model_name)
+    os.makedirs(tabular_output_dir, exist_ok=True)
+    print(f"\nSaving tabular data to {tabular_output_dir}...")
+
+    # Ensure Mean_da, Mean_elev, Mean_soil are numpy arrays
+    mean_da_arr = np.array(Mean_da)
+    mean_elev_arr = np.array(Mean_elev)
+    mean_soil_arr = np.array(Mean_soil)
+    iterations_arr = np.array(iterations) # Defined earlier in the script
+
+    # Check if lengths match for stacking. They should if logic is correct.
+    if not (len(iterations_arr) == len(mean_da_arr) == len(mean_elev_arr) == len(mean_soil_arr)):
+        print("Warning: Length mismatch between iterations and mean values. Timeseries data might be misaligned.")
+        # Fallback: Save them separately or adjust logic if this warning appears frequently
+
+    # Save mean values timeseries
+    try:
+        timeseries_data = np.column_stack((iterations_arr, mean_da_arr, mean_elev_arr, mean_soil_arr))
+        timeseries_header = "Time,Mean_Drainage_Area,Mean_Elevation,Mean_Soil_Depth"
+        timeseries_filename = os.path.join(tabular_output_dir, f"{config.model_name}_timeseries_means.csv")
+        np.savetxt(timeseries_filename, timeseries_data, delimiter=",", header=timeseries_header, comments='', fmt='%s') # Using %s to handle potential mixed types or ensure precision
+        print(f"Saved timeseries means to {timeseries_filename}")
+    except ValueError as e:
+        print(f"Error stacking or saving timeseries data: {e}. Check array lengths and contents.")
+        print(f"Iterations length: {len(iterations_arr)}")
+        print(f"Mean_da length: {len(mean_da_arr)}")
+        print(f"Mean_elev length: {len(mean_elev_arr)}")
+        print(f"Mean_soil length: {len(mean_soil_arr)}")
+
+    # Save quake times
+    quakes_times_arr = np.array(quakes_times)
+    quakes_header = "Quake_Time"
+    quakes_filename = os.path.join(tabular_output_dir, f"{config.model_name}_quake_times.csv")
+    np.savetxt(quakes_filename, quakes_times_arr, delimiter=",", header=quakes_header, comments='', fmt='%s')
+    print(f"Saved quake times to {quakes_filename}")
+
+    # Save fluvial event times
+    fluvial_header = "Fluvial_Start_Time,Fluvial_End_Time"
+    fluvial_filename = os.path.join(tabular_output_dir, f"{config.model_name}_fluvial_event_times.csv")
+    np.savetxt(fluvial_filename, fluvial_times, delimiter=",", header=fluvial_header, comments='', fmt='%s')
+    print(f"Saved fluvial event times to {fluvial_filename}")
 
     return mg
 # print(time)

@@ -21,6 +21,8 @@ class ModelConfig:
         self.alt_name = self.config['comments']['alt_name']
         self.home_path = self.config['saving']['home_path']
         self.save_location = 'output/%s'%self.model_name
+        self.save_format = self.config['saving']['output_filetype']
+        self.frequency_output = self.config['saving']['frequency_output']
 
         #Shape
         self.ymax=self.config['shape']['ymax']
@@ -59,6 +61,7 @@ class ModelConfig:
         #Strike Slip Fault 
         self.total_slip= float(self.config['tectonics']['total_slip']) #total distance to slip
         self.method= self.config['tectonics']['method'] #roll or drop 
+        self.slip_rate= float(self.config['tectonics']['slip_rate'])
 
         #Time
         self.total_model_time= float(self.config['time']['total_model_time'])

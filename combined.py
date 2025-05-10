@@ -24,9 +24,9 @@ def main():
 
     writer = imageio.get_writer(f'{config.home_path}/{config.save_location}/{config.model_name}_evolution.mp4', fps=20)
     #changed name of the vide maker when started from a differnt time 
-    build_steady_topo(config, writer)
+    #build_steady_topo(config, writer)
 
-    #run_geomorf_loop(config, writer)
+    run_geomorf_loop(config, writer)
 
     writer.close()
 
