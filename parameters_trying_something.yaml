@@ -1,12 +1,12 @@
 #config file for parameters
 saving:
-  model_name: 'test_netcdf_from_pickle' #'S05_K_D_C'
+  model_name: 'test_6' #'S05_K_D_C'
   home_path: '/Users/taranguiz/Research/steady-to-faulting'
   output_filetype: 'netcdf' # netcdf or pickle
-  frequency_output: 5000 # how often do we want to save the grids for dynamic_loop in years
+  frequency_output: 10000 # how often do we want to save the grids for dynamic_loop in years
 
 comments:
-  alt_name: 'testing_netcdf_file_save'
+  alt_name: 'changed_copy_netcdf'
 
 shape:
   ymax: 1000
@@ -38,7 +38,7 @@ tectonics:
   slip_rate: 10 # mm/yr
 
 time:
-  total_model_time: 15000 #6000000 
+  total_model_time: 300000 #6000000 
   # This can also be used as start time after an initial run to start from the last run year
   total_steady_time: 6000000 #total time for steady state
   dt_steady: 200

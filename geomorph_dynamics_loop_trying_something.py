@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 import pickle
 from collections import defaultdict
 import os # Added import
+import copy # Make sure copy is imported (it might already be as deepcopy)
 
 #from Landlab
 from landlab import RasterModelGrid, imshow_grid, imshowhs_grid
@@ -26,7 +27,7 @@ from landlab.components.space import SpaceLargeScaleEroder
 
 from ss_fault_function import ss_fault
 from util import get_file_sequence, add_file_to_writer
-from copy import deepcopy
+from copy import deepcopy # Ensure deepcopy is specifically imported
 #READING STEADY STATE TOPO
 
 def read_grid(config):
@@ -105,7 +106,7 @@ def run_geomorf_loop(config, writer):
     iterations= np.arange(0,config.total_model_time+config.dt_model,config.dt_model)
     print(iterations)
     
-    desired_slip_per_event=(config.slip_rate/1000)*config.dt_model
+    desired_slip_per_event=(config.total_slip/config.total_model_time)*config.dt_model
     shrink = 0.5
     fault_loc_y=int(mg.number_of_node_rows / 3.)
     fault_nodes = np.where(mg.node_y==(fault_loc_y*10))[0]
@@ -168,16 +169,24 @@ def run_geomorf_loop(config, writer):
 
     while time <= config.total_model_time:
 
-        z[mg.core_nodes]+= (config.uplift_rate*config.dt_model) #do uplift all the time
+        #z[mg.core_nodes]+= (config.uplift_rate*config.dt_model) #do uplift all the time
+        #rock[mg.core_nodes]+= (config.uplift_rate*config.dt_model)
+                
         rock[mg.core_nodes]+= (config.uplift_rate*config.dt_model)
+        z[:] = rock + soil
+        #z[mg.core_nodes]+= (config.uplift_rate*config.dt_model) #do uplift all the time
+        
         expweath.calc_soil_prod_rate()
         ddtd.run_one_step(config.dt_model)
+        
+        
         fr.run_one_step()
         
         #comment next line if is pulse climate
-        #space.run_one_step(config.dt_model)
+        space.run_one_step(config.dt_model)
 
-        
+        accumulate += desired_slip_per_event
+        print('is accumulating')
 
         Mean_da= np.append(Mean_da, np.mean(mg.at_node['drainage_area']))
         Mean_soil= np.append(Mean_soil, np.mean(mg.at_node['soil__depth']))
@@ -186,7 +195,8 @@ def run_geomorf_loop(config, writer):
         if accumulate >= mg.dx:
             ss_fault(grid=mg, 
                      fault_loc_y=fault_loc_y, 
-                     slip_rate=config.slip_rate, 
+                     total_slip=config.total_slip,
+                     total_time= config.total_model_time, 
                      method=config.method, 
                      accumulate=accumulate)
             accumulate = accumulate % mg.dx
@@ -196,24 +206,24 @@ def run_geomorf_loop(config, writer):
             quakes_times=np.append(quakes_times, time)
             print('one slip')
         
-        accumulate += desired_slip_per_event
-        print('is accumulating')
+        # accumulate += desired_slip_per_event
+        # print('is accumulating')
 
-        #comment next if when doing cont climate
-        if len(fluvial_times) > 0 and fluvial_idx < len(fluvial_times):  # Add safety check
-            if time >= fluvial_times[fluvial_idx,0] and time <= fluvial_times[fluvial_idx,1]:
-                print(f'is: {time} fluvial time, index {fluvial_idx}')
-                #fr.run_one_step()
-                space.run_one_step(config.dt_model)
-                if time == fluvial_times[fluvial_idx,1] and fluvial_idx < (len(fluvial_times)-1):
-                    fluvial_idx += 1
-                    print(f"Incremented fluvial index to {fluvial_idx}")
-                if fluvial_idx == (len(fluvial_times)-1):
-                    print("Reached last fluvial period")
-                    pass
+        # #comment next if when doing cont climate
+        # if len(fluvial_times) > 0 and fluvial_idx < len(fluvial_times):  # Add safety check
+        #     if time >= fluvial_times[fluvial_idx,0] and time <= fluvial_times[fluvial_idx,1]:
+        #         print(f'is: {time} fluvial time, index {fluvial_idx}')
+        #         #fr.run_one_step()
+        #         space.run_one_step(config.dt_model)
+        #         if time == fluvial_times[fluvial_idx,1] and fluvial_idx < (len(fluvial_times)-1):
+        #             fluvial_idx += 1
+        #             print(f"Incremented fluvial index to {fluvial_idx}")
+        #         if fluvial_idx == (len(fluvial_times)-1):
+        #             print("Reached last fluvial period")
+        #             pass
 
         
-        if time%10000 == 0: #time>0 and
+        if time%1000 == 0: #time>0 and
             # fig1 = plt.figure(figsize=[8, 8])
             imshow_grid(mg, z, cmap='coolwarm', shrink=shrink, grid_units=['m', 'm'])
             plt.title('Topography after ' + str(int(config.total_steady_time + time)) + ' years')
@@ -227,8 +237,7 @@ def run_geomorf_loop(config, writer):
 
             plt.clf()
             
-        if time%config.frequency_output == 0:                
-            
+        if time%config.frequency_output == 0: # Removed time>0 condition to allow saving at t=0 if frequency allows
             if hasattr(config, 'save_format'):
                 if config.save_format == 'pickle':
                     # Save grid state to memory (useful for current session, e.g. for final pickle dump if selected)
@@ -247,18 +256,23 @@ def run_geomorf_loop(config, writer):
                     current_time_for_filename = int(config.total_steady_time + time)
                     sequence_str = get_file_sequence(current_time_for_filename, config)
                     netcdf_filename = os.path.join(netcdf_output_dir, f"{config.model_name}{sequence_str}.nc")
-                    
-                    # Ensure known integer fields are explicitly int64 before saving
+
+                    # Create a copy specifically for saving to avoid modifying the live grid
+                    mg_to_save = deepcopy(mg)
+
+                    # Ensure known integer fields are explicitly int64 in the copy before saving
                     int_fields_to_cast = ['flood_status_code', 'flow__link_to_receiver_node', 'flow__receiver_node', 'flow__upstream_node_order']
                     for field_name in int_fields_to_cast:
-                        if field_name in mg.at_node and mg.at_node[field_name] is not None:
+                        # Operate on the copy (mg_to_save)
+                        if field_name in mg_to_save.at_node and mg_to_save.at_node[field_name] is not None:
                             try:
-                                mg.at_node[field_name] = mg.at_node[field_name].astype(np.int64)
+                                mg_to_save.at_node[field_name] = mg_to_save.at_node[field_name].astype(np.int64)
                             except Exception as e:
-                                print(f"Warning: Could not cast {field_name} to np.int64 before periodic save: {e}")
-                                
+                                print(f"Warning: Could not cast {field_name} in the copy to np.int64 before periodic save: {e}")
+
                     try:
-                        write_netcdf(netcdf_filename, mg, names=netcdf_field_names, format="NETCDF3_64BIT") 
+                        # Save the modified copy (mg_to_save)
+                        write_netcdf(netcdf_filename, mg_to_save, names=netcdf_field_names, format="NETCDF3_64BIT")
                         print(f"Saved NetCDF to {netcdf_filename}")
                     except Exception as e:
                         print(f"Error saving NetCDF file {netcdf_filename}: {e}")
@@ -291,17 +305,22 @@ def run_geomorf_loop(config, writer):
             sequence_str = get_file_sequence(final_time_for_filename, config)
             netcdf_filename = os.path.join(netcdf_output_dir, f"{config.model_name}{sequence_str}.nc")
 
-            # Ensure known integer fields are explicitly int64 before final saving
+            # Create a copy specifically for final saving
+            mg_to_save = deepcopy(mg)
+
+            # Ensure known integer fields are explicitly int64 in the copy before final saving
             int_fields_to_cast = ['flood_status_code', 'flow__link_to_receiver_node', 'flow__receiver_node', 'flow__upstream_node_order']
             for field_name in int_fields_to_cast:
-                if field_name in mg.at_node and mg.at_node[field_name] is not None:
+                # Operate on the copy (mg_to_save)
+                if field_name in mg_to_save.at_node and mg_to_save.at_node[field_name] is not None:
                     try:
-                        mg.at_node[field_name] = mg.at_node[field_name].astype(np.int64)
+                        mg_to_save.at_node[field_name] = mg_to_save.at_node[field_name].astype(np.int64)
                     except Exception as e:
-                        print(f"Warning: Could not cast {field_name} to np.int64 before final save: {e}")
-                        
+                        print(f"Warning: Could not cast {field_name} in the copy to np.int64 before final save: {e}")
+
             try:
-                write_netcdf(netcdf_filename, mg, names=netcdf_field_names, format="NETCDF3_64BIT") 
+                # Save the modified copy (mg_to_save)
+                write_netcdf(netcdf_filename, mg_to_save, names=netcdf_field_names, format="NETCDF3_64BIT")
                 print(f"\nFinal NetCDF saved to {netcdf_filename}")
             except Exception as e:
                 print(f"Error saving final NetCDF file {netcdf_filename}: {e}")
