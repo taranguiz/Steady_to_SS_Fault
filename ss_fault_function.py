@@ -4,11 +4,12 @@ import matplotlib.pyplot as plt
 from landlab import RasterModelGrid, imshow_grid, imshowhs_grid # landlab grid components
 from landlab.io import read_esri_ascii
 
-def ss_fault(grid, fault_loc_y, total_slip, total_time, method, accumulate):
+def ss_fault(grid, fault_loc_y, slip_rate, method, accumulate):
 
     #grid: raster model grid
     #fault_loc_y: y value (row) where fault is located
     #total_slip: total slip in meters
+    #slip_rate: slip rate in mm/yr taken from input file
     #method: drop or roll
     #accumulate: accumulated slip for this event (in meters), used to determine number of columns to shift.
     #faulted surface faulted_fields=[['topographic__elevation'], ['bedrock__elevation'], ['soil__depth']]
@@ -25,8 +26,8 @@ def ss_fault(grid, fault_loc_y, total_slip, total_time, method, accumulate):
 
 
     # INPUT FROM USER ABOUT TECTONICS
-    slip_rate = (total_slip / total_time)  # in m/yr
-    print(' the slip rate of your fault is ' + str(slip_rate * 1000) + ' in mm/yr')
+    #slip_rate = (total_slip / total_time)  # in m/yr
+    print(' the slip rate of your fault is ' + str(slip_rate) + ' in mm/yr')
     number_cols = int(accumulate/grid.dx)   # in m assuming characteristic behavior #number of columns
     print('number of columns dropped per event is: ' + str(number_cols))
 
