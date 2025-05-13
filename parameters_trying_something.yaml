@@ -1,12 +1,12 @@
 #config file for parameters
 saving:
-  model_name: 'test_6' #'S05_K_D_C'
+  model_name: 'test_7' #'S05_K_D_C'
   home_path: '/Users/taranguiz/Research/steady-to-faulting'
   output_filetype: 'netcdf' # netcdf or pickle
   frequency_output: 10000 # how often do we want to save the grids for dynamic_loop in years
 
 comments:
-  alt_name: 'changed_copy_netcdf'
+  alt_name: 'changed_slip_function'
 
 shape:
   ymax: 1000

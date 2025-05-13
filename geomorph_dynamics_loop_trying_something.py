@@ -106,7 +106,8 @@ def run_geomorf_loop(config, writer):
     iterations= np.arange(0,config.total_model_time+config.dt_model,config.dt_model)
     print(iterations)
     
-    desired_slip_per_event=(config.total_slip/config.total_model_time)*config.dt_model
+    desired_slip_per_event=(config.slip_rate/1000)*config.dt_model
+    #desired_slip_per_event=(config.total_slip/config.total_model_time)*config.dt_model
     shrink = 0.5
     fault_loc_y=int(mg.number_of_node_rows / 3.)
     fault_nodes = np.where(mg.node_y==(fault_loc_y*10))[0]
@@ -173,8 +174,8 @@ def run_geomorf_loop(config, writer):
         #rock[mg.core_nodes]+= (config.uplift_rate*config.dt_model)
                 
         rock[mg.core_nodes]+= (config.uplift_rate*config.dt_model)
-        z[:] = rock + soil
-        #z[mg.core_nodes]+= (config.uplift_rate*config.dt_model) #do uplift all the time
+        #z[:] = rock + soil
+        z[mg.core_nodes]+= (config.uplift_rate*config.dt_model) #do uplift all the time
         
         expweath.calc_soil_prod_rate()
         ddtd.run_one_step(config.dt_model)
@@ -185,8 +186,8 @@ def run_geomorf_loop(config, writer):
         #comment next line if is pulse climate
         space.run_one_step(config.dt_model)
 
-        accumulate += desired_slip_per_event
-        print('is accumulating')
+        #accumulate += desired_slip_per_event
+        #print('is accumulating')
 
         Mean_da= np.append(Mean_da, np.mean(mg.at_node['drainage_area']))
         Mean_soil= np.append(Mean_soil, np.mean(mg.at_node['soil__depth']))
@@ -195,8 +196,9 @@ def run_geomorf_loop(config, writer):
         if accumulate >= mg.dx:
             ss_fault(grid=mg, 
                      fault_loc_y=fault_loc_y, 
-                     total_slip=config.total_slip,
-                     total_time= config.total_model_time, 
+                     slip_rate= config.slip_rate,
+                     #total_slip=config.total_slip,
+                     #total_time= config.total_model_time, 
                      method=config.method, 
                      accumulate=accumulate)
             accumulate = accumulate % mg.dx
@@ -206,8 +208,8 @@ def run_geomorf_loop(config, writer):
             quakes_times=np.append(quakes_times, time)
             print('one slip')
         
-        # accumulate += desired_slip_per_event
-        # print('is accumulating')
+        accumulate += desired_slip_per_event
+        print('is accumulating')
 
         # #comment next if when doing cont climate
         # if len(fluvial_times) > 0 and fluvial_idx < len(fluvial_times):  # Add safety check
