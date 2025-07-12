@@ -2,7 +2,7 @@
 
 This repository contains the code for simulating landscape evolution under strike-slip faulting conditions, as described in the manuscript submitted to Geophysical Research Letters (GRL).
 
-Steady State Topography data is available in 
+Steady State Topography data is available in https://doi.org/10.5281/zenodo.15870957
 
 ## Overview
 
