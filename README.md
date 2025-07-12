@@ -25,7 +25,7 @@ This model simulates the transition from steady-state topography to strike-slip 
 ### Configuration
 - `parameters_trying_something.yaml` - Model parameters configuration file
 
-  ## Installation and Setup
+## Installation and Setup
 
 ### Prerequisites
 - Python 3.7+
