@@ -1,6 +1,6 @@
 # Strike-Slip Fault Landscape Evolution Model
 
-This repository contains the code for simulating landscape evolution under strike-slip faulting conditions, as described in the manuscript submitted to Geophysical Research Letters (GRL).
+This repository contains the code for simulating landscape evolution under strike-slip faulting conditions.
 
 Steady State Topography data is available in https://doi.org/10.5281/zenodo.15870957
 
