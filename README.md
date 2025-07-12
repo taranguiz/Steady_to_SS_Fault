@@ -41,5 +41,11 @@ This model simulates the transition from steady-state topography to strike-slip 
    ```
 3. Ensure Landlab is properly installed (see [Landlab documentation](https://landlab.readthedocs.io/))
 
+### Tutorial
+
+I am preparing a jupyter notebook to demostrate a quick use of the functions.
+Coming soon!
+
+### Data Files
 If you do not want to create a new synthetic topography you can use the following for replication: 
 Aranguiz-Rago, T. (2025). Steady State Topography used in models for "Climate oscillation and fault slip rate control sediment aggradation and channel morphology along strike-slip faults" [Data set]. Zenodo. https://doi.org/10.5281/zenodo.15870957
