@@ -51,4 +51,4 @@ If you do not want to create a new synthetic topography you can use the followin
 Aranguiz-Rago, T. (2025). Steady State Topography used in models for "Climate oscillation and fault slip rate control sediment aggradation and channel morphology along strike-slip faults" [Data set]. Zenodo. https://doi.org/10.5281/zenodo.15870957 
 
 ### How to cite?
-Aránguiz‐Rago, T. F., Duvall, A. R., Tucker, G. E., & Campforts, B. (2025). Climate oscillation and fault slip rate control sediment aggradation and channel morphology along strike‐slip faults. Geophysical Research Letters, 52, e2025GL118146. [https://doi.org/10.1029/2025GL118146] 
+Aránguiz‐Rago, T. F., Duvall, A. R., Tucker, G. E., & Campforts, B. (2025). Climate oscillation and fault slip rate control sediment aggradation and channel morphology along strike‐slip faults. Geophysical Research Letters, 52, e2025GL118146.[https://doi.org/10.1029/2025GL118146] 
